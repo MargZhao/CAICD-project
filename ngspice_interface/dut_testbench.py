@@ -4,8 +4,8 @@ import os
 import scipy.interpolate as interp
 import scipy.optimize as sciopt
 from scipy.optimize import differential_evolution
-from .area_estimation import BPTM45nmAreaEstimator
-from .ngspice_wrapper import NgspiceWrapper
+from area_estimation import BPTM45nmAreaEstimator
+from ngspice_wrapper import NgspiceWrapper
 
 
 class DUT(NgspiceWrapper):
@@ -58,6 +58,14 @@ class DUT(NgspiceWrapper):
         Hint:
         Use numpy's abs() function to calculate the magnitude of the complex number at each point.
         """
+        # Vin's amp is 1
+        magnitude = np.abs(vout)
+    
+        dc_gain_linear = magnitude[0]
+    
+        dc_gain_db = 20 * np.log10(dc_gain_linear)
+        
+        return dc_gain_db
         pass
         
     def find_ugbw(self, freq, vout):
@@ -70,6 +78,16 @@ class DUT(NgspiceWrapper):
         3. Use _get_best_crossing() to find the crossing point through interpolation
         4. What should you if no crossing is found? What situations can lead to this?
         """
+        magnitude  = np.abs(vout)
+        ubgw, found = self._get_best_crossing(freq,magnitude,1)
+        if found:
+            return ubgw
+        else:
+            if magnitude[0]>1:
+                print("Warning: no unity-gain crossing found, measure range is not enough")
+            else: 
+                print("warning: gain always lower than 1")
+            return -1
         pass
     
     def find_phm(self, freq, vout):
@@ -83,6 +101,17 @@ class DUT(NgspiceWrapper):
         4. Calculate phase margin (watch out for radians/degrees units and phase wrap around)
         5. Handle edge cases (e.g., when gain is always < 1) --> hint: you can think in RL terms; worst case reward ...
         """
+        gain = np.abs(vout)
+        phase = np.angle(vout, deg=True)
+        ugbw = self.find_ugbw(freq,vout)
+        if ugbw == -1:
+            print("warning, no ugbw found, phm not defined")
+            return np.nan
+        phase_fun = interp.interp1d(freq, phase, kind='quadratic', fill_value='extrapolate')
+        phase_at_ugbw = float(phase_fun(ugbw))
+        phm = 180.0 + phase_at_ugbw
+        return phm
+
         pass
     
     def find_slew_rate(self, time, signal, threshold_low=0.1, threshold_high=0.9, time_unit='us'):
@@ -96,6 +125,42 @@ class DUT(NgspiceWrapper):
         5. Handle edge cases (e.g., no rising edges found)
         6. Final value should be in V/us
         """
+        v_min, v_max = np.min(signal), np.max(signal)
+        v_low = v_min + threshold_low * (v_max - v_min)
+        v_high = v_min + threshold_high * (v_max - v_min)
+        v_diff = v_high - v_low
+        slew_rates = []
+        i = 0
+        n = len(signal)
+        while i < n-1:
+            while i < n - 1 and signal[i] > v_low:
+                i += 1
+            # Now signal[i] <= v10
+            # while i < n - 1 and signal[i+1] < v_low:
+            #     i += 1
+            start_idx = i
+
+            # Find when it next exceeds v90
+            while i < n - 1 and signal[i] < v_high:
+                i += 1
+            stop_idx = i
+
+            if start_idx < stop_idx and stop_idx < n:
+                time_seg = time[start_idx:stop_idx+1]
+                sig_seg = signal[start_idx:stop_idx+1]
+                t_low, low_found = self._get_best_crossing(time_seg,sig_seg,v_low)
+                t_high, high_found = self._get_best_crossing(time_seg,sig_seg,v_high)
+                if low_found and high_found:
+                    slope = v_diff/(t_high-t_low)
+                    slew_rates.append(slope)   
+        if len(slew_rates) == 0:
+            print("warning: no big edge is found")
+            return np.nan
+
+        avg_slew = np.mean(slew_rates)
+
+        return avg_slew*1e-6   #unit should be V/us
+
         pass
 
     def _get_best_crossing(cls, xvec, yvec, val):
@@ -109,3 +174,57 @@ class DUT(NgspiceWrapper):
             return sciopt.brentq(fzero, xstart, xstop), True
         except ValueError:
             return xstop, False
+        
+if __name__ == "__main__":
+    project_path = os.getcwd()
+    yaml_path = os.path.join(project_path, 'ngspice_interface', 'files', 'yaml_files', 'TwoStage.yaml')
+    parameters = {
+        'mp1': 10,
+        'wp1': 5.0e-07,
+        'lp1': 100.0e-09,
+        'mn1': 10,
+        'wn1': 5.0e-07,
+        'ln1': 100.0e-09,
+        'mp3': 10,
+        'wp3': 5.0e-07,
+        'lp3': 100.0e-09,
+        'mn3': 10,
+        'wn3': 5.0e-07,
+        'ln3': 100.0e-09,
+        'mn4': 10,
+        'wn4': 5.0e-07,
+        'ln4': 100.0e-09,
+        'mn5': 10,
+        'wn5': 5.0e-07,
+        'ln5': 100.0e-09,
+        'cap': 5.0e-12,
+        'res': 5.0e+3
+    }
+    process = "TT"
+    temp_pvt = 27
+    vdd = 1.2
+    dut =DUT(yaml_path)
+    new_netlist_path = dut.create_new_netlist(parameters, process, temp_pvt, vdd)
+    info = dut.simulate(new_netlist_path)
+    print(f"New netlist created at: {new_netlist_path}")
+    print("info:", info)
+    print("trf:", dut.trf)
+    print("period:", dut.period)
+    print("VDD:", dut.VDD)
+
+    spec_dict = dut.measure_metrics()
+    print("gain is: ",spec_dict["gain"])
+    print("ugbw is: ",spec_dict["ugbw"])
+    print("slew rate is: ",spec_dict['slewRate'])
+    print("phm is: ",spec_dict['phm'])
+    print("area is: ",spec_dict['area']) 
+    print("current is: ",spec_dict['current']) 
+    print("total noise is: ",spec_dict['noise'])       
+    # area_estimator = BPTM45nmAreaEstimator(self.circuit_params, self.circuit_multipliers)
+    # spec_dict['area'] = area_estimator.find_area()
+    # spec_dict['current'] = self.current
+    # spec_dict['gain'] = self.find_dc_gain(self.vout_complex)
+    # spec_dict['noise'] = self.noise
+    # spec_dict['phm'] = self.find_phm(self.freq, self.vout_complex)
+    # spec_dict['slewRate'] = self.find_slew_rate(self.time, self.vout_tran, threshold_low=0.1, threshold_high=0.9, time_unit='us')
+    # spec_dict['ugbw'] = self.find_ugbw(self.freq, self.vout_complex)  

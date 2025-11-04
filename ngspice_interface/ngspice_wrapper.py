@@ -77,7 +77,7 @@ class NgspiceWrapper(object):
                     if parameters is not None and param_name in parameters:
                         new_value = str(parameters[param_name])
                     elif param_name == "temp_pvt" and temp_pvt is not None:
-                        new_value = str(temp_pvt)
+                       new_value = str(temp_pvt)
                     elif param_name in ["VREF", "ICMV"] and vcm is not None:
                         new_value = str(vcm)
                     elif param_name == "VHIGH" and vhigh is not None:
@@ -158,7 +158,6 @@ if __name__ == "__main__":
     temp_pvt = 27
     vdd = 1.2
     ngspice_wrapper = NgspiceWrapper(yaml_path)
-    
     new_netlist_path = ngspice_wrapper.create_new_netlist(parameters, process, temp_pvt, vdd)
     info = ngspice_wrapper.simulate(new_netlist_path)
     print(f"New netlist created at: {new_netlist_path}")

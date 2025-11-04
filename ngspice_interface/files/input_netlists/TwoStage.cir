@@ -43,33 +43,43 @@ vdd VDD 0 dc=VDD
 vss VSS 0 dc=0
 CL net6 0 cload
 
+
+*simulation setting
 .control
-run
+* run
 set units=degrees
 set wr_vecnames
 option numdgt=7
 * set temperature
-set temp=temp_pvt
+.option temp={temp_pvt}
+
+* set temp=temp_pvt
 
 * transient analysis
 tran 50n 30u
 * save Vout data in a file named 'tran_TwoStage.csv'
 * --- ??? ---
+wrdata tran_TwoStage.csv v(net6)
+
 
 * ac analysis
 ac dec 10 1 1T
 * save Vout data in a file named 'ac_TwoStage.csv'
-* --- ??? ---
+* --- vdb is in db and vp in phase---
+wrdata ac_TwoStage.csv v(net6)
 
 * noise analysis
 * calculate the output noise and save it in a file named 'noise_TwoStage.csv'
 * --- ??? ---
 * --- ??? ---
-
+noise v(net6) Vinput dec 10 1 10MEG
+wrdata noise_TwoStage.csv all
 * dc analysis
 op
 * save the total current consumption in a file named 'dc_TwoStage.csv'
 * --- ??? ---
+let I_total = -i(vdd)
+wrdata dc_TwoStage.csv I_total
 
 .endc
 
