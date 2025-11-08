@@ -171,9 +171,10 @@ class CircuitEnv(gym.Env):
         - The observation is returned as a NumPy array of type float32.
         """
         self.episode_steps = 0
+        # self.counter = 0
         random_action = np.random.uniform(low=-1.0, high=1.0, size=self.n_actions)
-        ob, reward, done, info = self.step(random_action)
-        self.episode_steps = 0
+        self.evaluate(random_action)
+        ob = np.array(list(self.cur_norm_specs.values()), dtype= np.float32).flatten()
         self.score = 0.0
         return ob
 
@@ -209,27 +210,27 @@ class CircuitEnv(gym.Env):
         info = {}
         self.evaluate(action)
         reward, hard_satisfied = self.reward_computation(self.cur_norm_specs)
-        
+
+        # 3. Update the current observation.
+        ob = np.array(list(self.cur_norm_specs.values()), dtype=np.float32).flatten()
+        # 4. Append the reward to the reward history and update the score.
         self.reward_history.append(reward)
         self.score += reward
         info["goal"] = hard_satisfied
-    
-        obs_values = []                     
-        for key,value in self.cur_norm_specs.items():                
-            obs_values.append(value)         
-        ob = np.array(obs_values, dtype=np.float32)
 
+        # 5. Create output directories if they do not exist.
         out_dir = f'./output_figs/{self.run_id}/'
         os.makedirs(out_dir, exist_ok=True)
-
+        # 6. If the goal state is reached, plot the running maximum reward.
         if hard_satisfied and len(self.reward_history) > 0:
             plot_running_maximum(self.reward_history,self.run_id)
         
         self.env_steps += 1
         self.episode_steps += 1
-        
-        if self.episode_steps >=self.max_steps_per_episode:
+        self.counter += 1
+        if self.counter%10 == 0:
             self.score_history.append(self.score)
+            print(f"Step: {self.env_steps} | Episode Step: {self.episode_steps} | Score: {self.score:.4f}")
             done = True
             plotLearning(self.score_history,self.run_id)
             self.score = 0.0
@@ -258,7 +259,6 @@ class CircuitEnv(gym.Env):
         """
         reward = 0.0
         hard_satisfied =False
-        all_satisfied = True
         r_H = 0.0
         r_T = 0.0
         for spec_name in self.hard_constraints:
@@ -271,8 +271,8 @@ class CircuitEnv(gym.Env):
             r_t = -norm_specs[spec_name]
             r_T += r_t
         if r_H >= self.success_threshold:
-            all_satisfied = True
             reward = 0.3 + r_T
+            hard_satisfied = True
         else:
             reward = r_H + 0.05 * r_T
         return reward, hard_satisfied

@@ -112,8 +112,8 @@ class TD3(object):
             state = state.reshape(1, -1)
 		
         # 用 actor 网络计算确定性动作（不加梯度）
-        with torch.no_grad():
-            action = self.actor(state).cpu().data.numpy().flatten()
+        # with torch.no_grad():
+        action = self.actor(state).cpu().data.numpy().flatten()
         # 添加探索噪声
         std = self.max_action * self.expl_noise
         noise = np.random.normal(0, std, size=self.action_dim)
@@ -160,13 +160,15 @@ class TD3(object):
             update: Update step (not used in this implementation)
         """
         self.total_it += 1
-        state, action, reward, next_state, done =  memory_batch
-        not_done = 1. - done   #TODO: verify this  
+        state, action, reward, next_state, not_done =  memory_batch
+
+        # print(f"[Before to(device)] state: {state.shape}, action: {action.shape}, next_state: {next_state.shape}")
         state      = state.to(device)
         action     = action.to(device)
         next_state = next_state.to(device)
         reward     = reward.to(device)
         not_done   = not_done.to(device)
+        # print(f"[Actor Input] next_state: {next_state.shape}")
 
         # 3️⃣ Compute target actions with policy noise
         with torch.no_grad():
@@ -179,7 +181,8 @@ class TD3(object):
             next_action = (
                 self.actor_target(next_state) + noise
             ).clamp(-self.max_action, self.max_action)
-
+            # print(f"[Target Action] next_action: {next_action.shape}")
+            
             # 4️⃣ Compute target Q-value
             target_Q1, target_Q2 = self.critic_target(next_state, next_action)
             target_Q = torch.min(target_Q1, target_Q2)
@@ -198,7 +201,7 @@ class TD3(object):
 
         # 8️⃣ Delayed policy update
         if self.total_it % self.policy_freq == 0:
-            print(f"Iter {self.total_it} | Critic Loss: {critic_loss.item():.4f} | Actor Loss: {actor_loss.item():.4f}")
+            #print(f"Iter {self.total_it} | Critic Loss: {critic_loss.item():.4f} | Actor Loss: {actor_loss.item():.4f}")
             # a. Compute actor loss (maximize Q, i.e., minimize -Q)
             actor_loss = -self.critic.Q1(state, self.actor(state)).mean()
 

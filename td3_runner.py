@@ -61,12 +61,14 @@ def train(args, env, agent, env_pool):
     total_steps = warmup_exploration(args, env, env_pool, agent)
     while total_steps < args.T:
         obs = env.reset()
+        # print("ob shape:", obs.shape)
         done = False
         while not done:
             action = agent.select_action(obs)
             next_state, reward, done, info = env.step(action)
             env_pool.push(obs, action, reward, next_state, done)
             obs = next_state
+            #print("ob shape:", obs.shape)
             train_policy(args, env_pool, agent, total_steps)
             total_steps += 1
             # clean up the no_backup folder every 100 steps
@@ -79,6 +81,7 @@ def warmup_exploration(args, env, env_pool, agent):
     step_counter = 0
     while step_counter < args.w:
         obs = env.reset()
+        print("ob shape:", obs.shape)
         done = False
         while not done:
             action = env.action_space.sample()

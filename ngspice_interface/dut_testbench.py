@@ -81,7 +81,7 @@ class DUT(NgspiceWrapper):
         magnitude  = np.abs(vout)
         ubgw, found = self._get_best_crossing(freq,magnitude,1)
         if found:
-            print("ubgw found at: ", ubgw)
+            # print("ubgw found at: ", ubgw)
             return ubgw
         else:
             if magnitude[0]>1:
@@ -111,7 +111,7 @@ class DUT(NgspiceWrapper):
         phase_fun = interp.interp1d(freq, phase, kind='quadratic', fill_value='extrapolate')
         phase_at_ugbw = float(phase_fun(ugbw))
         phm = 180.0 + phase_at_ugbw
-        print("phm found:", phm)
+        # print("phm found:", phm)
         return phm
 
         pass
@@ -127,12 +127,12 @@ class DUT(NgspiceWrapper):
         5. Handle edge cases (e.g., no rising edges found)
         6. Final value should be in V/us
         """
-        plt.plot(time, signal)
-        plt.title("Input Signal for Slew Rate Calculation")
-        plt.xlabel("Time [s]")
-        plt.ylabel("Voltage [V]")
-        plt.grid(True)
-        plt.show()
+        # plt.plot(time, signal)
+        # plt.title("Input Signal for Slew Rate Calculation")
+        # plt.xlabel("Time [s]")
+        # plt.ylabel("Voltage [V]")
+        # plt.grid(True)
+        # plt.show()
         v_min, v_max = max(np.min(signal),0), min(np.max(signal),1.20)
         v_low = v_min + threshold_low * (v_max - v_min)
         v_high = v_min + threshold_high * (v_max - v_min)
