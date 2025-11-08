@@ -1,1 +1,1 @@
-source venv/bin/activate
+source /users/micas/mahmadza/public/bin/cad_env/bin/activate

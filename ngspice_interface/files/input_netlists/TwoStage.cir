@@ -35,7 +35,7 @@ rc net8 net6 res
 ibias VDD net7 ibias
 
 Vicm VCM VSS dc=vcm
-Vinput aid VSS dc=0.0 ac=1.0 PULSE(0 VHIGH trf trf trf {0.5*period-trf} period)
+Vinput aid VSS dc=0.0 ac=1.0 PULSE({-VHIGH*0.5} {VHIGH*0.5} trf trf trf {0.5*period-trf} period)
 ein1 net1 VCM aid 0 0.5
 ein2 net2 VCM aid 0 -0.5
 
@@ -78,7 +78,7 @@ wrdata noise_TwoStage.csv all
 op
 * save the total current consumption in a file named 'dc_TwoStage.csv'
 * --- ??? ---
-let I_total = -i(vdd)
+let I_total = i(vdd)
 wrdata dc_TwoStage.csv I_total
 
 .endc
